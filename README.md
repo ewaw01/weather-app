@@ -170,26 +170,29 @@ jwt.expiration=86400000
 Базовый URL: http://localhost:8080
 
 ### Аутентификация (/api/auth)
-Метод	Эндпоинт	Описание
-POST	/api/auth/register	Регистрация
-POST	/api/auth/login	Логин (возвращает JWT)
+| Метод | Эндпоинт | Описание |
+|-------|----------|----------|
+| POST | `/api/auth/register` | Регистрация нового пользователя |
+| POST | `/api/auth/login` | Логин, возвращает JWT-токен |
 
 ### Основные эндпоинты (/api/weather)
-Метод	Эндпоинт	Доступ	Описание
-POST	/admin/users	ADMIN	Создать пользователя
-GET	/admin/users	ADMIN	Все пользователи (пагинация)
-DELETE	/admin/users/{id}	ADMIN	Удалить пользователя
-DELETE	/admin/locations/{id}	ADMIN	Удалить локацию из кэша
-PUT	/users/{userId}/locations	USER/ADMIN	Добавить локацию
-PUT	/users/{id}	USER/ADMIN	Обновить данные
-GET	/users/{id}/locations	USER/ADMIN	Избранные локации
-DELETE	/users/{id}/locations	USER/ADMIN	Удалить локацию
-GET	/info/locations	USER	Погода по названию
-GET	/locations	USER	Все локации (пагинация)
+| Метод | Эндпоинт | Доступ | Описание |
+|-------|----------|--------|----------|
+| POST | `/admin/users` | `ADMIN` | Создать пользователя |
+| GET | `/admin/users` | `ADMIN` | Получить всех пользователей (пагинация) |
+| DELETE | `/admin/users/{id}` | `ADMIN` | Удалить пользователя |
+| DELETE | `/admin/locations/{id}` | `ADMIN` | Удалить локацию из кэша |
+| PUT | `/users/{userId}/locations` | `USER` / `ADMIN` | Добавить локацию в избранное |
+| PUT | `/users/{id}` | `USER` / `ADMIN` | Обновить данные пользователя |
+| GET | `/users/{id}/locations` | `USER` / `ADMIN` | Получить избранные локации |
+| DELETE | `/users/{id}/locations` | `USER` / `ADMIN` | Удалить локацию из избранного |
+| GET | `/info/locations` | `USER` | Получить погоду по названию |
+| GET | `/locations` | `USER` | Получить все локации (пагинация) |
 
 ## Примеры запросов (Postman)
+
 1. Регистрация
-http
+```http
 POST http://localhost:8080/api/auth/register
 Content-Type: application/json
 
@@ -198,8 +201,10 @@ Content-Type: application/json
   "password": "123456",
   "username": "john"
 }
+```
+
 2. Логин (получить JWT)
-http
+```http
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
@@ -207,8 +212,10 @@ Content-Type: application/json
   "email": "user@test.com",
   "password": "123456"
 }
+```
+
 3. Добавить локацию (USER)
-http
+```http
 PUT http://localhost:8080/api/weather/users/1/locations
 Authorization: Bearer <JWT>
 Content-Type: application/json
@@ -216,19 +223,25 @@ Content-Type: application/json
 {
   "name": "Москва"
 }
+```
+
 4. Получить погоду
-http
+```http
 GET http://localhost:8080/api/weather/info/locations?name=москва
 Authorization: Bearer <JWT>
+```
+
 5. Получить избранные локации
-http
+```http
 GET http://localhost:8080/api/weather/users/1/locations
 Authorization: Bearer <JWT>
+```
+
 6. Удалить локацию
-http
+```http
 DELETE http://localhost:8080/api/weather/users/1/locations?name=москва
 Authorization: Bearer <JWT>
-Полный список примеров — в папке screenshots/
+```
 
 ## Тестирование
 Проект покрыт unit-тестами и интеграционными тестами:
