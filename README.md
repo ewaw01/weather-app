@@ -1,58 +1,79 @@
-# 🌤️Weather Application
-REST API приложение для управления избранными локациями и получения актуальной погоды.
-Пользователи могут добавлять города в избранное, удалять их и получать свежие данные о погоде с автоматическим кэшированием.
+# 🌤️ Weather Application
 
-## _Оглавление_
-- О проекте
-- Стек технологий
-- Что умеет приложение
-- Проблемы и моменты, с которыми столкнулся
-- Как запустить
-- API-эндпоинты
-- Примеры запросов (Postman)
-- Тестирование
-- Дальнейшие планы развития проекта
-- Контакты
+**REST API** для работы с погодой и избранными локациями.  
+Реализована **JWT-аутентификация**, ролевая модель (`USER` / `ADMIN`),  
+**кэширование** погоды с автоматическим обновлением и **unit-тесты** с покрытием ~75%.
 
-## _О проекте_
+---
 
-Данный проект я разработал с целью отточить навыки создания полноценных Spring Boot REST API-приложений. На данный момент в нём можно добавлять себе локации
-в избранное и смотреть погоду. Данные берутся из OpenWeatherMap.
+## 📚 Оглавление
 
-## _Технологии_
-* Язык - Java 21
-* Фреймворк - Spring Boot 4.x
-* БД - PostgreSQL, H2 (тесты)
-* ORM - Spring Data JPA (Hibernate)
-* Сборка - Maven
-* Тестирование - JUnit 5, Mockito, Spring Boot Test
+- [О проекте](#-о-проекте)
+- [Стек технологий](#-стек-технологий)
+- [Что умеет приложение](#-что-умеет-приложение)
+- [Проблемы и решения](#-проблемы-и-решения)
+- [Как запустить](#-как-запустить)
+- [API-эндпоинты](#-api-эндпоинты)
+- [Примеры запросов](#-примеры-запросов-postman)
+- [Тестирование](#-тестирование)
+- [Дальнейшие планы](#-дальнейшие-планы)
+- [Контакты](#-контакты)
 
-## _Что умеет приложение?_
+---
 
-**Пользователи:**
-  * Регистрация - создание нового пользователя с уникальным userId
-  * Просмотр всех пользователей - с пагинацией
-  * Обновление данных - изменить userId
-  * Удаление - пользователь удаляется вместе со всеми связями
+## О проекте
 
-**Локации:**
-  * Добавление локации - пользователь может добавить локацию в избранное
-  * Просмотр избранных локаций - список всех локаций пользователя
-  * Удаление локации - можно удалить конкретную локацию из избранного
-  * Защита от дублей - нельзя добавить одну локацию пользователю
+Проект создан для отработки навыков разработки **REST API** на **Spring Boot** с акцентом на:
 
-**Погода:**
-  * Получение погоды по названию - запрос к OpenWeatherMap API
-  * Умное кэширование - данные хранятся в БД 3 часа, затем обновляются
+- реальную **JWT-аутентификацию** и **ролевую авторизацию**
+- **Many-to-Many** связь между пользователями и локациями
+- **кэширование** данных погоды с инвалидацией
+- **глобальную обработку ошибок** и **логирование**
+- полноценное **тестирование** (юнит + интеграционное)
 
-**Дополнительно**
-  * Пагинация - данные пользователей/локации можно посмотреть в пагинированном виде
-  * Динамические фильтры - искать пользователей/локации можно по нескольким параметрам (фильтрам)
-  * Глобальная обработка ошибок - единый формат ответов об ошибках
-  * Логирование - все события логируются
-  * Тесты - покрыты основные сценарии
+---
 
-## _Проблемы и моменты, с которыми столкнулся_
+## Стек технологий
+
+| Категория | Технологии |
+|-----------|-------------|
+| **Язык** | Java 21 |
+| **Фреймворк** | Spring Boot 3, Spring Security, Spring Data JPA |
+| **Безопасность** | JWT (JJWT), BCrypt |
+| **Базы данных** | PostgreSQL, H2 (тесты) |
+| **Тестирование** | JUnit 5, Mockito, Spring Boot Test |
+| **Сборка** | Maven |
+| **Инструменты** | Git, Postman, IntelliJ IDEA, Docker (база) |
+
+---
+
+## Что умеет приложение
+
+### 👤 Пользователи
+- Регистрация и логин (JWT)
+- Просмотр всех пользователей (только ADMIN)
+- Обновление своих данных (USER) или любых (ADMIN)
+- Удаление пользователя (только ADMIN)
+
+### 📍 Локации
+- Добавление локации в избранное (USER — себе, ADMIN — любому)
+- Просмотр избранных локаций пользователя
+- Удаление локации из избранного
+- Защита от дублей (нельзя добавить одну локацию дважды)
+
+### 🌦️ Погода
+- Получение погоды по названию города
+- **Умное кэширование**: данные хранятся 3 часа, затем обновляются
+
+### 🧩 Дополнительно
+- **Пагинация** и **динамические фильтры**
+- **Глобальная обработка ошибок**
+- **Логирование** всех ключевых событий
+- **Unit-тесты** (покрытие ~75%)
+
+---
+
+## Проблемы и решения
 
 _Проблема_: Поначалу я хранил локации пользователя отдельным полем в БД в виде строки с пробелами ("москва париж зимбабве ").
 То есть у меня эта строка сплитилась просто по пробелу, когда нужна была локация, допустим для проверки на наличие.
@@ -67,209 +88,176 @@ _Проблема_: Данные о погоде не обновлялись в 
 _Проблема_: TransientPropertyValueException ошибка при сохранении пользователя с новой локацией. Из-за того, что
 сохранял пользователя раньше локации, возникала ошибка трансиентности, так как локация оставалась в, так сказать, незавершенном состоянии.
 
-## _Как запустить?_
+_Проблема_: В UserEntity не работали аннотации @CreatedDate и @LastModifiedDate. Добавил аннотацию @EnableJpaAuditing в главном классе WeatherApplication
+и добавил @EntityListeners(AuditingEntityListener.class) в UserEntity.
 
-**Шаг 1: Требования**
-  * Java 21 (java -version)
-  * Maven 3.8+ (mvn -version)
-  * PostgreSQL любая (psql --version)
+_Проблема_: После добавления security и jwt-аутентификации нужно было переписать тесты контроллера, старая аннотация @WebMvcTest уже не подходила, так как
+она загружала только контекст контроллеров, а у меня, во-первых, стоит аннотация @EnableJpaAuditing над главным классом, которая создает JPA-модель, во-вторых,
+теперь, прежде чем запрос перейдет к контроллерам, он сначала идет через фильтры security и проверки jwt, из-за чего тоже возникают проблемы. Было принято решение
+использовать аннотацию @SpringBootTest, которая загружает весь контекст. Теперь мы можем заинжектить репозиторий и все нужные бины для security.
 
-**Шаг 2: Клонирование репозитория**
+_Проблема_: Есть такие запросы, как обновление данных пользователя. У меня работало так, что любой пользователь мог поменять данные другому. Было принято передавать в подобные
+методы контроллера текущего авторизованного пользователя UserDetails, и уже в сервисе сверять его с передаваемыми данными.
+
+## Как запустить
+
+### 1. Требования
+- Java 21 (`java -version`)
+- Maven 3.8+ (`mvn -version`)
+- PostgreSQL (`psql --version`)
+
+### 2. Клонирование
 ```bash
 git clone https://github.com/ewaw01/Weather-application.git
 cd Weather-application
-```
-**Шаг 3: Создать БД**
 
-Способ 1 — через Docker (рекомендуется):
+### 3. Создать БД
+Через Docker (рекомендуется):
 
-* ```bash
-  docker run --name weather-postgres \
-    -p 5432:5432 \
-    -e POSTGRES_USER=postgres \
-    -e POSTGRES_PASSWORD=your_password \
-    -e POSTGRES_DB=weather_db \
-    -d postgres
-  ```
-* Замени your_password на свой пароль
-* Проверить, что БД запустиласть docker ps
-* Остановить контейнер: docker stop weather-postgres
-  
-Способ 2 — через локальный PostgreSQL:
+```bash
+docker run --name weather-postgres \
+  -p 5432:5432 \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=your_password \
+  -e POSTGRES_DB=weather_db \
+  -d postgres
 
-  * Запускаем PostgreSQL
-  * Создаем БД: CREATE DATABASE weather_db;
-  * Можно также через командную строку: createdb -U postgres weather_db
+Через локальный PostgreSQL:
 
-**Шаг 4: Получить API ключ OpenWeatherMap**
-  * Зарегистрируйся на OpenWeatherMap
-  * Перейди в раздел "My API Keys"
-  * Скопируй свой API ключ (или создай новый)
+```sql
+CREATE DATABASE weather_db;
 
-**Шаг 5: Настройка конфигурации (application.properties)**
+### 4. Получить API-ключ OpenWeatherMap
+Зарегистрироваться на OpenWeatherMap
 
-Для начала создайте папку resources. Далле в ней создайте файл application.properties (src/main/resources/application.properties), куда нужно будет перенести следующие настройки:
+Скопировать API-ключ в разделе «My API Keys»
 
-  * БД настройки:
-    ```bash
-    spring.datasource.url=jdbc:postgresql://localhost:5432/weather_db
-    spring.datasource.username=postgres
-    spring.datasource.password=your_password
-    ```
-  * JPA настройки:
-    ```bash
-    spring.jpa.hibernate.ddl-auto=update
-    spring.jpa.show-sql=true
-    spring.jpa.properties.hibernate.format_sql=true
-    ```
-  * OpenWeatherMap API:
-    ```bash
-    openweather.api.key=YOUR_API_KEY_HERE
-    openweather.api.base-url=https://api.openweathermap.org/data/2.5
-    openweather.defaults.units=metric
-    openweather.defaults.lang=ru
-    ```
-  * Требуется заменить your_password на свой пароль PostgreSQL, а YOUR_API_KEY_HERE на реальный API ключ
+### 5. Настроить application.properties
+Создай файл src/main/resources/application.properties:
 
-**Шаг 6: Запуск приложения**
-  * ./mvnw spring-boot:run
+properties
+# База данных
+spring.datasource.url=jdbc:postgresql://localhost:5432/weather_db
+spring.datasource.username=postgres
+spring.datasource.password=your_password
 
-## _API-эндпоинты_
+#### JPA
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
 
-Все эндпоинты имеют базовый url: /api/weather
+#### OpenWeatherMap
+openweather.api.key=YOUR_API_KEY_HERE
+openweather.api.base-url=https://api.openweathermap.org/data/2.5
+openweather.defaults.units=metric
+openweather.defaults.lang=ru
 
-**Пользователи:**
-  - POST /users - создать нового пользователя
-  - GET /users - получить список пользователей (с фильтрацией и пагинацией). Параметры:
-    id, userId, pageNum, pageSize (все параметры необязательные)
-  - PUT /users/{id} - обновить данные пользователя
-  - DELETE /users/{id} - удалить пользователя
-  - GET /users/{id}/locations - получить все локации пользователя
-  - PUT /users/{userId}/locations - добавить локацию пользователю
-  - DELETE /users/{id}/locations - удалить локацию у пользователя (по названию)
+#### JWT
+jwt.secret=YOUR_SECRET_KEY_HERE
+jwt.expiration=86400000
 
-**Локации и погода**
-  - GET /locations - получить список всех локаций (с фильтрацией и пагинацией). Параметры:
-    id, name, country, description, icon, temperature, humidity, windSpeed, sunrise, sunset, time, pageNum, pageSize (все параметры необязательные)
-  - GET /info/locations - получить погоду по названию локации
-  - DELETE /locations/{id} - удалить локацию из кэша
+### 6. Запуск
 
-## _Примеры запросов (Postman)_
-1. Создать пользователя:
-   POST http://localhost:8080/api/weather/users
-   
-   body:
-   {
-    "userId" : "Nori"
-   }
-   
-   Скриншот из Postman:
-   ![Создание пользователя](screenshots/post-user.png)
+```bash
+./mvnw spring-boot:run
 
-2. Получить всех пользователей с пагинацией:
-   GET http://localhost:8080/api/weather/users?pageNum=0&pageSize=10
-   
-   Скриншот из Postman:
-   ![Получение пользователей](screenshots/get-users.png)
+## API-эндпоинты
+Базовый URL: http://localhost:8080
 
-3. Добавить локацию пользователю:
-   PUT http://localhost:8080/api/weather/users/18/locations
-   
-   body:
-   {
-    "name" : "Москва"
-   }
-   
-   Скриншот из Postman:
-   ![Добавление локации](screenshots/add-location.png)
+### Аутентификация (/api/auth)
+Метод	Эндпоинт	Описание
+POST	/api/auth/register	Регистрация
+POST	/api/auth/login	Логин (возвращает JWT)
 
-4. Получить локации пользователя:
-   GET http://localhost:8080/api/weather/users/23/locations
-   
-   Скриншот из Postman:
-   ![Локации пользователя](screenshots/user-locations.png)
+### Основные эндпоинты (/api/weather)
+Метод	Эндпоинт	Доступ	Описание
+POST	/admin/users	ADMIN	Создать пользователя
+GET	/admin/users	ADMIN	Все пользователи (пагинация)
+DELETE	/admin/users/{id}	ADMIN	Удалить пользователя
+DELETE	/admin/locations/{id}	ADMIN	Удалить локацию из кэша
+PUT	/users/{userId}/locations	USER/ADMIN	Добавить локацию
+PUT	/users/{id}	USER/ADMIN	Обновить данные
+GET	/users/{id}/locations	USER/ADMIN	Избранные локации
+DELETE	/users/{id}/locations	USER/ADMIN	Удалить локацию
+GET	/info/locations	USER	Погода по названию
+GET	/locations	USER	Все локации (пагинация)
 
-5. Получить погоду по названию локации:
-   GET http://localhost:8080/api/weather/info/locations?name=москва
-   
-   Скриншот из Postman:
-   ![Получение погоды](screenshots/get-weather.png)
+## Примеры запросов (Postman)
+1. Регистрация
+http
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
 
-6. Удалить локацию у пользователя:
-   DELETE http://localhost:8080/api/weather/users/18/locations?name=москва
-   
-   Скриншот из Postman:
-   ![Удаление локации](screenshots/delete-location.png)
+{
+  "email": "user@test.com",
+  "password": "123456",
+  "username": "john"
+}
+2. Логин (получить JWT)
+http
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
 
-7. Удалить пользователя:
-   DELETE http://localhost:8080/api/weather/users/1
+{
+  "email": "user@test.com",
+  "password": "123456"
+}
+3. Добавить локацию (USER)
+http
+PUT http://localhost:8080/api/weather/users/1/locations
+Authorization: Bearer <JWT>
+Content-Type: application/json
 
-   Скриншот из Postman:
-   ![Удаление пользователя](screenshots/delete-user.png)
+{
+  "name": "Москва"
+}
+4. Получить погоду
+http
+GET http://localhost:8080/api/weather/info/locations?name=москва
+Authorization: Bearer <JWT>
+5. Получить избранные локации
+http
+GET http://localhost:8080/api/weather/users/1/locations
+Authorization: Bearer <JWT>
+6. Удалить локацию
+http
+DELETE http://localhost:8080/api/weather/users/1/locations?name=москва
+Authorization: Bearer <JWT>
+Полный список примеров — в папке screenshots/
 
-8. Получить все локации (кэш):
-   GET http://localhost:8080/api/weather/locations?pageNum=0&pageSize=10
+## Тестирование
+Проект покрыт unit-тестами и интеграционными тестами:
 
-   Скриншот из Postman:
-   ![Все локации](screenshots/all-locations.png)
+MainServiceTest — бизнес-логика (Mockito)
 
-9. Обновить пользователя:
-   PUT http://localhost:8080/api/weather/users/18
+WeatherControllerTest — REST API (MockMvc, JWT)
 
-   body:
-   {
-    "userId" : "Vova1_Updated"
-   }
-   
-   Скриншот из Postman:
-   ![Обновление пользователя](screenshots/update-user.png)
+UserRepositoryTest — репозитории (DataJpaTest)
 
-**Пару примеров ошибок:**
+Всего тестов: 40+
+Покрытие кода: ~75%
 
-10. Ошибка 404 — пользователь не найден:
-    DELETE http://localhost:8080/api/weather/users/999
-    
-    Скриншот из Postman:
-    ![Ошибка 404](screenshots/error-404.png)
+### Запуск тестов:
 
-12. Ошибка 400 — неверные данные:
-    POST http://localhost:8080/api/weather/users
-    
-    body:
-    {
-     "userId" : ""
-    }
-    
-    Скриншот из Postman:
-    ![Ошибка 400](screenshots/error-400.png)
+```bash
+./mvnw test
 
-## _Тестирование_
+## Дальнейшие планы
+1. Добавить Redis для эффективного кэширования
 
-Проект покрыт unit-тестами и интеграционными тестами.
-  - Junit5 + Mockito - для сервисного слоя
-  - @WebMvcTest - для тестирования REST API
-  - @DataJpaTest - для тестирования репозиториев
+2. Реализовать refresh-токены
 
-Проверяются:
-  - CRUD операции с пользователями и локациями
-  - Кэширование погоды (проверка временных интервалов)
-  - Добавление и удаление локаций у пользователя
-  - REST эндпоинты и HTTP статусы (200, 201, 400, 404)
-  - Глобальная обработка ошибок
+3. Контейнеризация через Docker Compose
 
-Всего тестов 40+, покрытие кода ~75%
+4. Подключить Swagger/OpenAPI
 
-Запустить тесты: ./mvnw test
+5. Настроить CI/CD (GitHub Actions)
 
-## _Дальнейшие планы развития проекта_
-1. Кэширование — добавить Redis для более эффективного кэширования погоды
-2. Безопасность — внедрить Spring Security с JWT аутентификацией
-3. Docker — контейнеризация приложения и базы данных
-4. Документация API — подключить Swagger/OpenAPI
-5. CI/CD — настроить автоматическое тестирование через GitHub Actions
-6. Telegram бот — добавить возможность получать погоду в Telegram (Telegram Web Apps)
+6. Сделать Telegram-бота для получения погоды
+
 7. Функционал — сохранять историю запросов пользователя, автоматическое определение города по IP
 
-## _Контакты_
+## 📫 Контакты
+GitHub: github.com/ewaw01
 
-GitHub: [github.com/ewaw01](https://github.com/ewaw01)
+Telegram: @voin_drakona2000
