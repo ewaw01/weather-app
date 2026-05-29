@@ -74,4 +74,55 @@ public class UserRepositoryTest {
         Assertions.assertTrue(found.isEmpty());
     }
 
+    @Test
+    @DisplayName("поиск пользователя по email - пользователь существует")
+    public void findByEmail_EmailExists() {
+        UserEntity userEntity = new UserEntity();
+        userEntity.setEmail("tutta@test.com");
+        userEntity.setId(null);
+        userEntity.setUserId("Tutta");
+
+        String email = entityManager.persistAndFlush(userEntity).getEmail();
+
+        Optional<UserEntity> foundUser = userRepository.findByEmail(email);
+
+        Assertions.assertTrue(foundUser.isPresent());
+        Assertions.assertEquals("tutta@test.com", foundUser.get().getEmail());
+    }
+
+    @Test
+    @DisplayName("поиск пользователя по email - пользователь не существует")
+    public void findByEmail_EmailNotExists() {
+        String email = "tutta@test.com";
+
+        Optional<UserEntity> foundUser = userRepository.findByEmail(email);
+
+        Assertions.assertTrue(foundUser.isEmpty());
+    }
+
+    @Test
+    @DisplayName("проверка на существование пользователя по email - существует")
+    public void existsByEmail_EmailExists() {
+        UserEntity userEntity = new UserEntity();
+        userEntity.setEmail("tutta@test.com");
+        userEntity.setId(null);
+        userEntity.setUserId("Tutta");
+
+        String email = entityManager.persistAndFlush(userEntity).getEmail();
+
+        boolean exists = userRepository.existsByEmail(email);
+
+        Assertions.assertTrue(exists);
+    }
+
+    @Test
+    @DisplayName("проверка на существование пользователя по email - не существует")
+    public void existsByEmail_EmailNotExists() {
+        String email = "tutta@test.com";
+
+        boolean exists = userRepository.existsByEmail(email);
+
+        Assertions.assertFalse(exists);
+    }
+
 }

@@ -14,6 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -118,34 +120,42 @@ public class WeatherService {
     @Transactional
     public Location postLocationForUser(
             String nameLocation,
-            Long userId
+            Long userId,
+            UserDetails currentUser
     ) {
         log.info("postLocationForUser call");
 
-        UserEntity oldUser = userRepository.findById(userId).orElseThrow(()->
+        UserEntity user = userRepository.findById(userId).orElseThrow(()->
                 new NoSuchElementException("User Not Found"));
+
+        boolean isSelf = currentUser.getUsername().equals(user.getEmail());
+        boolean isAdmin = currentUser.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+        if (!isSelf && !isAdmin) {
+            throw new SecurityException("You do not have permission to access this resource");
+        }
 
         nameLocation = nameLocation.toLowerCase();
 
         Optional<LocationEntity> existingLocation = locationRepository.findByName(nameLocation);
-        if (existingLocation.isPresent() && oldUser.getLocationEntities().contains(existingLocation.get())) {
+        if (existingLocation.isPresent() && user.getLocationEntities().contains(existingLocation.get())) {
             throw new LocationIsAlreadyIncludedException("Location already exists");
         }
 
         if(locationRepository.findByName(nameLocation).isPresent()) {
             LocationEntity newLocation = locationRepository.findByName(nameLocation).get();
 
-            oldUser.getLocationEntities().add(newLocation);
+            user.getLocationEntities().add(newLocation);
 
-            userRepository.save(oldUser);
+            userRepository.save(user);
 
             return locationMapper.toDomain(newLocation);
         } else {
             LocationEntity newLocation = getInfoLocation(nameLocation);
             locationRepository.save(newLocation);
 
-            oldUser.getLocationEntities().add(newLocation);
-            userRepository.save(oldUser);
+            user.getLocationEntities().add(newLocation);
+            userRepository.save(user);
 
             return locationMapper.toDomain(newLocation);
         }

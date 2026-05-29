@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -110,24 +111,28 @@ public class MainService {
         return null;
     }
 
-    public User updateUser(
-            Long id,
-            User user
-    ) {
+    public User updateUser(Long id, User user, UserDetails currentUser) {
         log.info("Updating user with id " + id);
 
-        Optional<UserEntity> userEntity1 = userRepository.findById(id);
-        Optional<UserEntity> userEntity2 = userRepository.findByUserId(user.userId());
-        if (userEntity1.isEmpty()) {
-            throw new NoSuchElementException("User with id " + id + " not found");
-        } else if (userEntity2.isPresent() && !userEntity1.get().getId().equals(userEntity2.get().getId())) {
+        UserEntity existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("User with id " + id + " not found"));
+
+        boolean isSelf = currentUser.getUsername().equals(existingUser.getEmail());
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isSelf && !isAdmin) {
+            throw new SecurityException("You can only update your own profile");
+        }
+
+        Optional<UserEntity> userWithSameUserId = userRepository.findByUserId(user.userId());
+        if (userWithSameUserId.isPresent() && !userWithSameUserId.get().getId().equals(id)) {
             throw new UserAlreadyExistException("User id " + user.userId() + " already exists");
         }
 
-        var updatedUser = userRepository.save(new UserEntity(
-                id,
-                user.userId()
-        ));
+        existingUser.setUserId(user.userId());
+
+        UserEntity updatedUser = userRepository.save(existingUser);
 
         return userMapper.toDomain(updatedUser);
     }

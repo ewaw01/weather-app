@@ -8,6 +8,7 @@ import com.example.weather_application.mappers.LocationMapper;
 import com.example.weather_application.mappers.UserMapper;
 import com.example.weather_application.repos.LocationRepository;
 import com.example.weather_application.repos.UserRepository;
+import com.example.weather_application.security.Role;
 import com.example.weather_application.services.MainService;
 import com.example.weather_application.services.WeatherService;
 import com.example.weather_application.user.User;
@@ -20,12 +21,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 
 @ExtendWith(MockitoExtension.class)
 public class MainServiceTest {
@@ -152,18 +151,24 @@ public class MainServiceTest {
                 null,
                 "Fofa"
         );
-        UserEntity oldUserEntity = new UserEntity(
-                23L,
-                "Fufa"
-        );
-        UserEntity updatedUserEntity = new UserEntity(
-                23L,
-                "Fofa"
-        );
+        UserEntity oldUserEntity = new UserEntity();
+        oldUserEntity.setId(23L);
+        oldUserEntity.setUserId("Fufa");
+        oldUserEntity.setEmail("fufa@test.com");
+        oldUserEntity.setRole(Role.ROLE_USER);
+
+        UserEntity updatedUserEntity = new UserEntity();
+        updatedUserEntity.setId(23L);
+        updatedUserEntity.setUserId("Fofa");
+        updatedUserEntity.setEmail("fufa@test.com");
+        updatedUserEntity.setRole(Role.ROLE_USER);
+
         User userOutput = new User(
                 23L,
                 "Fofa"
         );
+
+        UserDetails userDetails = mockUserDetails("fufa@test.com", "ROLE_USER");
 
         Mockito.when(userRepository.findById(uId))
                 .thenReturn(Optional.of(oldUserEntity));
@@ -172,7 +177,7 @@ public class MainServiceTest {
         Mockito.when(userMapper.toDomain(Mockito.any(UserEntity.class)))
                 .thenReturn(userOutput);
 
-        User result = mainService.updateUser(uId, userInput);
+        User result = mainService.updateUser(uId, userInput, userDetails);
 
         Assertions.assertEquals(userOutput, result);
 
@@ -189,13 +194,14 @@ public class MainServiceTest {
                 null,
                 "Fofa"
         );
+        UserDetails userDetails = mockUserDetails("fufa@test.com", "ROLE_USER");
 
         Mockito.when(userRepository.findById(uId))
                 .thenReturn(Optional.empty());
 
         NoSuchElementException exception = Assertions.assertThrows(
                 NoSuchElementException.class,
-                () -> mainService.updateUser(uId, userInput)
+                () -> mainService.updateUser(uId, userInput, userDetails)
         );
 
         Assertions.assertEquals("User with id 23 not found", exception.getMessage());
@@ -529,6 +535,14 @@ public class MainServiceTest {
         Assertions.assertEquals("User is not has location with name " + name, exception.getMessage());
         Mockito.verify(userRepository, Mockito.times(1)).findById(id);
         Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
+    }
+
+    private UserDetails mockUserDetails(String email, String role) {
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(email)
+                .password("password")
+                .authorities(role)
+                .build();
     }
 
 }

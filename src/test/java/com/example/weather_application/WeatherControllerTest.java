@@ -1,20 +1,36 @@
 package com.example.weather_application;
 
 import com.example.weather_application.controllers.WeatherController;
+import com.example.weather_application.entities.UserEntity;
 import com.example.weather_application.errors.LocationIsAlreadyIncludedException;
 import com.example.weather_application.errors.UserAlreadyExistException;
 import com.example.weather_application.location.Location;
 import com.example.weather_application.location.LocationSearchFilter;
+import com.example.weather_application.repos.LocationRepository;
+import com.example.weather_application.repos.UserRepository;
+import com.example.weather_application.security.CustomUserDetailsService;
+import com.example.weather_application.security.JwtAuthenticationFilter;
+import com.example.weather_application.security.JwtUtil;
+import com.example.weather_application.security.Role;
 import com.example.weather_application.services.MainService;
 import com.example.weather_application.services.WeatherService;
 import com.example.weather_application.user.User;
 import com.example.weather_application.user.UserSearchFilter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -23,9 +39,12 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
-@WebMvcTest(controllers = WeatherController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 public class WeatherControllerTest {
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -34,37 +53,60 @@ public class WeatherControllerTest {
 
     @MockitoBean
     private MainService mainService;
+
     @MockitoBean
     private WeatherService weatherService;
 
-    @Test
-    @DisplayName("POST /api/weather/users - успешное добавление")
-    void postUserTest_UserNotExist_ProvideCreated201() throws Exception {
-        User userInput = new User(
-                null,
-                "Globus27"
-        );
-        User userOutput = new User(
-                23L,
-                "Globus27"
-        );
+    @Autowired
+    private JwtUtil jwtUtil;
 
-        Mockito.when(mainService.addUser(userInput)).thenReturn(userOutput);
+    @Autowired
+    private UserRepository userRepository;
+
+    private String adminToken;
+
+    @BeforeEach
+    void setUp() {
+        Optional<UserEntity> user = userRepository.findByEmail("admintst@test.com");
+
+        if (user.isEmpty()) {
+            UserEntity userEntity = new UserEntity();
+            userEntity.setEmail("admintst@test.com");
+            userEntity.setPassword(new BCryptPasswordEncoder().encode("password"));
+            userEntity.setUserId("admintst");
+            userEntity.setRole(Role.ROLE_ADMIN);
+            userEntity.setIsBlocked(false);
+
+            userRepository.save(userEntity);
+        }
+
+        adminToken = jwtUtil.generateToken("admintst@test.com", Role.ROLE_ADMIN);
+    }
+
+    @Test
+    @DisplayName("POST /api/weather/admin/users - успешное добавление")
+    void postUserTest_UserNotExist_ProvideCreated201() throws Exception {
+        User userInput = new User(null, "Globus27");
+        User userOutput = new User(23L, "Globus27");
+
+        Mockito.when(mainService.addUser(Mockito.any(User.class)))
+                .thenReturn(userOutput);
 
         String requestBody = objectMapper.writeValueAsString(userInput);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/weather/users")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/weather/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(MockMvcResultMatchers.status().isCreated())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(23L))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.userId").value("Globus27"));
 
-        Mockito.verify(mainService, Mockito.times(1)).addUser(userInput);
+        Mockito.verify(mainService, Mockito.times(1)).addUser(Mockito.any(User.class));
     }
 
     @Test
-    @DisplayName("POST /api/weather/users - юзер уже существует, ошибка")
+    @DisplayName("POST /api/weather/admin/users - юзер уже существует, ошибка")
     void postUserTest_UserExist_ProvideBadRequest400() throws Exception {
         User userInput = new User(
                 null,
@@ -73,7 +115,8 @@ public class WeatherControllerTest {
 
         Mockito.when(mainService.addUser(Mockito.any(User.class))).thenThrow(UserAlreadyExistException.class);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/weather/users")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/weather/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userInput)))
                 .andExpect(MockMvcResultMatchers.status().isBadRequest())
@@ -83,7 +126,7 @@ public class WeatherControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/weather/users? - успешное получение списка пользователей с пагинацией")
+    @DisplayName("GET /api/weather/admin/users? - успешное получение списка пользователей с пагинацией")
     void findUserByFilter_ShouldReturnUsersList() throws Exception {
         List<User> mockUsers = List.of(
                 new User(1L, "Globus27"),
@@ -93,7 +136,8 @@ public class WeatherControllerTest {
 
         Mockito.when(mainService.searchAllUsersByFilter(Mockito.any(UserSearchFilter.class))).thenReturn(mockUsers);
 
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/users")
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
                         .param("id", "1")
                         .param("userId", "Globus27")
                         .param("pageNum", "0")
@@ -112,7 +156,7 @@ public class WeatherControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/weather/users? - без параметров (должны использоваться значения по умолчанию)")
+    @DisplayName("GET /api/weather/admin/users? - без параметров (должны использоваться значения по умолчанию)")
     void findUserByFilter_WithoutParameters_ShouldUseDefaultValues() throws Exception {
         List<User> mockUsers = List.of(
                 new User(1L, "Globus27")
@@ -120,7 +164,8 @@ public class WeatherControllerTest {
 
         Mockito.when(mainService.searchAllUsersByFilter(Mockito.any(UserSearchFilter.class))).thenReturn(mockUsers);
 
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/users")
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(1));
@@ -129,7 +174,7 @@ public class WeatherControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/weather/locations? - успешное получение списка пользователей с пагинацией")
+    @DisplayName("GET /api/weather/locations? - успешное получение списка локаций с пагинацией")
     void findLocationByFilter_ShouldReturnLocationsList() throws Exception {
         List<Location> mockLocations = List.of(
                 new Location(
@@ -176,6 +221,7 @@ public class WeatherControllerTest {
         Mockito.when(mainService.searchAllLocationsByFilter(Mockito.any(LocationSearchFilter.class))).thenReturn(mockLocations);
 
         mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .param("id", "1")
                         .param("name", "berlin")
                         .param("pageNum", "0")
@@ -215,6 +261,7 @@ public class WeatherControllerTest {
         Mockito.when(mainService.searchAllLocationsByFilter(Mockito.any(LocationSearchFilter.class))).thenReturn(mockLocations);
 
         mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(1));
@@ -223,27 +270,29 @@ public class WeatherControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/weather/users/{id} - успешное удаление")
+    @DisplayName("DELETE /api/weather/admin/users/{id} - успешное удаление")
     void deleteUserById_UserExists() throws Exception {
         Long id = 23L;
 
         Mockito.doNothing().when(mainService).deleteUser(id);
 
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/users/" + id))
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/admin/users/" + id)
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(MockMvcResultMatchers.status().isOk());
 
         Mockito.verify(mainService, Mockito.times(1)).deleteUser(id);
     }
 
     @Test
-    @DisplayName("DELETE /api/weather/users/{id} - юзера не существует")
+    @DisplayName("DELETE /api/weather/admin/users/{id} - юзера не существует")
     void deleteUserById_UserNotExists() throws Exception {
         Long id = 23L;
 
         Mockito.when(mainService.deleteUser(id))
                 .thenThrow(new NoSuchElementException());
 
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/users/" + id))
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/admin/users/" + id)
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(MockMvcResultMatchers.status().isNotFound())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("Not found"));
 
@@ -251,27 +300,29 @@ public class WeatherControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/weather/locations/{id} - успешное удаление")
+    @DisplayName("DELETE /api/weather/admin/locations/{id} - успешное удаление")
     void deleteLocationById_UserExists() throws Exception {
         Long id = 23L;
 
         Mockito.doNothing().when(mainService).deleteLocation(id);
 
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/locations/" + id))
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/admin/locations/" + id)
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(MockMvcResultMatchers.status().isOk());
 
         Mockito.verify(mainService, Mockito.times(1)).deleteLocation(id);
     }
 
     @Test
-    @DisplayName("DELETE /api/weather/locations/{id} - локации не существует")
+    @DisplayName("DELETE /api/weather/admin/locations/{id} - локации не существует")
     void deleteLocationById_UserNotExists() throws Exception {
         Long id = 23L;
 
         Mockito.when(mainService.deleteLocation(id))
                 .thenThrow(new NoSuchElementException());
 
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/locations/" + id))
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/admin/locations/" + id)
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(MockMvcResultMatchers.status().isNotFound())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("Not found"));
 
@@ -296,12 +347,13 @@ public class WeatherControllerTest {
                 "18"
         );
 
-        Mockito.when(weatherService.postLocationForUser(locationInput.name(), 23L))
+        Mockito.when(weatherService.postLocationForUser(Mockito.anyString(),Mockito.anyLong(), Mockito.any(UserDetails.class)))
                 .thenReturn(locationOutput);
 
         String content = objectMapper.writeValueAsString(locationInput);
 
         mockMvc.perform(MockMvcRequestBuilders.put("/api/weather/users/" + idU + "/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(content))
                 .andExpect(MockMvcResultMatchers.status().isOk())
@@ -317,7 +369,7 @@ public class WeatherControllerTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$.sunset").value(1769964429L))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.time").value("18"));
 
-        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(locationInput.name(), idU);
+        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(Mockito.anyString(),Mockito.anyLong(), Mockito.any(UserDetails.class));
     }
 
     @Test
@@ -326,16 +378,17 @@ public class WeatherControllerTest {
         Long idU = 23L;
         Location locationInput = new Location(null, "Париж", null, null, null, null, null, null, null, null, null);
 
-        Mockito.when(weatherService.postLocationForUser(Mockito.anyString(), Mockito.eq(idU)))
+        Mockito.when(weatherService.postLocationForUser(Mockito.anyString(), Mockito.eq(idU), Mockito.any(UserDetails.class)))
                 .thenThrow(new LocationIsAlreadyIncludedException("Location already exists"));
 
         mockMvc.perform(MockMvcRequestBuilders.put("/api/weather/users/" + idU + "/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(locationInput)))
                 .andExpect(MockMvcResultMatchers.status().isInternalServerError())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("Something went wrong"));
 
-        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(Mockito.anyString(), Mockito.eq(idU));
+        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(Mockito.anyString(), Mockito.eq(idU), Mockito.any(UserDetails.class));
     }
 
     @Test
@@ -344,16 +397,17 @@ public class WeatherControllerTest {
         Long idU = 23L;
         Location locationInput = new Location(null, "Приж", null, null, null, null, null, null, null, null, null);
 
-        Mockito.when(weatherService.postLocationForUser(Mockito.anyString(), Mockito.eq(idU)))
+        Mockito.when(weatherService.postLocationForUser(Mockito.anyString(), Mockito.eq(idU), Mockito.any(UserDetails.class)))
                 .thenThrow(new IllegalArgumentException());
 
         mockMvc.perform(MockMvcRequestBuilders.put("/api/weather/users/" + idU + "/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(locationInput)))
                 .andExpect(MockMvcResultMatchers.status().isBadRequest())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("Incorrect data, bad request"));
 
-        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(Mockito.anyString(), Mockito.eq(idU));
+        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(Mockito.anyString(), Mockito.eq(idU), Mockito.any(UserDetails.class));
     }
 
     @Test
@@ -362,16 +416,17 @@ public class WeatherControllerTest {
         Long idU = 23L;
         Location locationInput = new Location(null, "Приж", null, null, null, null, null, null, null, null, null);
 
-        Mockito.when(weatherService.postLocationForUser(Mockito.anyString(), Mockito.eq(idU)))
+        Mockito.when(weatherService.postLocationForUser(Mockito.anyString(), Mockito.eq(idU), Mockito.any(UserDetails.class)))
                 .thenThrow(new NoSuchElementException());
 
         mockMvc.perform(MockMvcRequestBuilders.put("/api/weather/users/" + idU + "/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(locationInput)))
                 .andExpect(MockMvcResultMatchers.status().isNotFound())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("Not found"));
 
-        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(Mockito.anyString(), Mockito.eq(idU));
+        Mockito.verify(weatherService, Mockito.times(1)).postLocationForUser(Mockito.anyString(), Mockito.eq(idU), Mockito.any(UserDetails.class));
     }
 
     @Test
@@ -387,19 +442,20 @@ public class WeatherControllerTest {
                 "New Name"
         );
 
-        Mockito.when(mainService.updateUser(Mockito.eq(idU), Mockito.any(User.class)))
+        Mockito.when(mainService.updateUser(Mockito.eq(idU), Mockito.any(User.class), Mockito.any(UserDetails.class)))
                 .thenReturn(userOutput);
 
         String response = objectMapper.writeValueAsString(userInput);
 
         mockMvc.perform(MockMvcRequestBuilders.put("/api/weather/users/" + idU)
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(response))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(idU))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.userId").value("New Name"));
 
-        Mockito.verify(mainService, Mockito.times(1)).updateUser(Mockito.eq(idU), Mockito.any(User.class));
+        Mockito.verify(mainService, Mockito.times(1)).updateUser(Mockito.eq(idU), Mockito.any(User.class), Mockito.any(UserDetails.class));
     }
 
     @Test
@@ -411,18 +467,19 @@ public class WeatherControllerTest {
                 "New Name"
         );
 
-        Mockito.when(mainService.updateUser(Mockito.eq(idU), Mockito.any(User.class)))
+        Mockito.when(mainService.updateUser(Mockito.eq(idU), Mockito.any(User.class), Mockito.any(UserDetails.class)))
                 .thenThrow(new NoSuchElementException());
 
         String response = objectMapper.writeValueAsString(userInput);
 
         mockMvc.perform(MockMvcRequestBuilders.put("/api/weather/users/" + idU)
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(response))
                 .andExpect(MockMvcResultMatchers.status().isNotFound())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("Not found"));
 
-        Mockito.verify(mainService, Mockito.times(1)).updateUser(Mockito.eq(idU), Mockito.any(User.class));
+        Mockito.verify(mainService, Mockito.times(1)).updateUser(Mockito.eq(idU), Mockito.any(User.class), Mockito.any(UserDetails.class));
     }
 
     @Test
@@ -447,6 +504,7 @@ public class WeatherControllerTest {
                 .thenReturn(locationOutput);
 
         mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/info/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .param("name", locationName)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
@@ -474,6 +532,7 @@ public class WeatherControllerTest {
                 .thenThrow(new NoSuchElementException());
 
         mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/info/locations")
+                        .header("Authorization", "Bearer " + adminToken)
                         .param("name", locationName)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isNotFound())
@@ -519,6 +578,7 @@ public class WeatherControllerTest {
                 .thenReturn(locationsOutput);
 
         mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/users/{id}/locations", id)
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.jsonPath("$[0].id").value(1L))
@@ -538,6 +598,7 @@ public class WeatherControllerTest {
                 .thenThrow(new NoSuchElementException());
 
         mockMvc.perform(MockMvcRequestBuilders.get("/api/weather/users/{id}/locations", id)
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isNotFound());
 
@@ -550,10 +611,11 @@ public class WeatherControllerTest {
         Long id = 23L;
         String locationName = "москва";
 
-        Mockito.doReturn(null)
+        Mockito.doNothing()
                 .when(mainService).deleteLocationForUser(Mockito.eq(id), Mockito.eq(locationName));
 
         mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/users/{id}/locations", id)
+                        .header("Authorization", "Bearer " + adminToken)
                         .param("name", locationName)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk());
@@ -571,6 +633,7 @@ public class WeatherControllerTest {
                 .thenThrow(new NoSuchElementException());
 
         mockMvc.perform(MockMvcRequestBuilders.delete("/api/weather/users/{id}/locations", id)
+                        .header("Authorization", "Bearer " + adminToken)
                         .param("name", locationName)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isNotFound());

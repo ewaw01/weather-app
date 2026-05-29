@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,7 +30,7 @@ public class WeatherController {
         this.weatherService = weatherService;
     }
 
-    @PostMapping("/users")
+    @PostMapping("/admin/users")
     public ResponseEntity<User> postUser (
             @RequestBody @Valid User user
     ) {
@@ -38,7 +40,7 @@ public class WeatherController {
                 .body(mainService.addUser(user));
     }
 
-    @GetMapping("/users")
+    @GetMapping("/admin/users")
     public ResponseEntity<List<User>> findUserByFilter(
         @RequestParam(name = "id", required = false) Long id,
         @RequestParam(name = "userId", required = false) String userId,
@@ -98,7 +100,7 @@ public class WeatherController {
         );
     }
 
-    @DeleteMapping("/users/{id}")
+    @DeleteMapping("/admin/users/{id}")
     public ResponseEntity<Void> deleteUser (
             @PathVariable Long id
     ) {
@@ -107,7 +109,7 @@ public class WeatherController {
                 .body(mainService.deleteUser(id));
     }
 
-    @DeleteMapping("/locations/{id}")
+    @DeleteMapping("/admin/locations/{id}")
     public ResponseEntity<Void> deleteLocation (
             @PathVariable Long id
     ) {
@@ -119,24 +121,26 @@ public class WeatherController {
     @PutMapping("/users/{userId}/locations")
     public ResponseEntity<Location> postLocation (
            @PathVariable Long userId,
-           @RequestBody Location location
+           @RequestBody Location location,
+           @AuthenticationPrincipal UserDetails userDetails
     ) {
         log.info("Posting location " + location.name() + " for user with id {}", userId);
         log.warn("Данные поступают только на ру раскладке, иначе баг !!!!!!! " + location.name());
 
         return ResponseEntity.ok()
-                .body(weatherService.postLocationForUser(location.name(), userId));
+                .body(weatherService.postLocationForUser(location.name(), userId, userDetails));
     }
 
     @PutMapping("/users/{id}")
     public ResponseEntity<User> updateUser (
             @PathVariable("id") Long id,
-            @RequestBody @Valid User user
+            @RequestBody @Valid User user,
+            @AuthenticationPrincipal UserDetails currentUser
     ) {
         log.info("Updating user with id {}", user.id());
 
         return ResponseEntity.ok()
-                .body(mainService.updateUser(id, user));
+                .body(mainService.updateUser(id, user, currentUser));
     }
 
     @GetMapping("/info/locations")
